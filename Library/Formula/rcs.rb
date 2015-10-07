@@ -12,12 +12,53 @@ class Rcs < Formula
     sha1 "f47df6b50e9d48d06a72b03e9425cf4bf4fbc429" => :mountain_lion
   end
 
+  head do
+    url "git://git.savannah.gnu.org/rcs.git", :branch => 'next'
+
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "texinfo" => :build
+
+    resource "gnulib" do
+      url "git://git.savannah.gnu.org/gnulib.git"
+    end
+
+    resource "gnulib_patch" do
+      url "https://gist.githubusercontent.com/zchee/034fea97ac9bfbb55280/raw/e37971626f5c2bf6f3fbbe4cfec474e39e6d2dc0/gnulib-path_max.patch"
+    end
+
+  end
+
   def install
+
+    if build.head?
+
+      gnulib_path = buildpath/"gnulib"
+      gnulib_path.install resource("gnulib")
+      
+      # gnulib head configure broken on macosx atm
+      # temp fix thanks to @zchee...
+      Dir.chdir "gnulib"
+      (Pathname.pwd).install resource("gnulib_patch")
+      system "patch", "-p1", "-i", "gnulib-path_max.patch"
+
+      system "ln", "-s", "/sbin/md5", "md5sum"
+      ENV["PATH"] += ":" + Pathname.pwd
+
+      Dir.chdir buildpath
+
+      # TODO: How do we figure out the latest installed version?
+      ENV["PATH"] = "/usr/local/Cellar/texinfo/6.0/bin:" + ENV["PATH"]
+
+      system "sh", "autogen.sh"
+    end
+
     system "./configure", "--disable-dependency-tracking",
                           "--disable-silent-rules",
                           "--prefix=#{prefix}"
     system "make", "install"
-  end
+
+end
 
   test do
     system bin/"merge", "--version"
